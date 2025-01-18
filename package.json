@@ -1,0 +1,9 @@
+{
+    "license": "UNLICENSED",
+    "scripts": {
+        "format": "prettier --write ./client"
+    },
+    "devDependencies": {
+        "prettier": "^3.4.2"
+    }
+}

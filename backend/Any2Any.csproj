@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Any2Any.Prototype</AssemblyName>
+        <RootNamespace>$(AssemblyName)</RootNamespace>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <OutputType>Exe</OutputType>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+        <DisableImplicitFrameworkReferences>false</DisableImplicitFrameworkReferences>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="ClosedXML" Version="0.104.2"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.12"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="8.0.12"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.12"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.12">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="Grpc.AspNetCore" Version="2.67.0"/>
+        <PackageReference Include="Grpc.AspNetCore.Web" Version="2.67.0"/>
+        <PackageReference Include="Google.Protobuf" Version="3.29.3"/>
+    </ItemGroup>
+
+    <Target Name="ForceClean" AfterTargets="Clean">
+        <RemoveDir Directories="$(OutDir)/../"/>
+    </Target>
+
+    <ItemGroup>
+        <Content Include="source_files/**/*.xlsx">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+</Project> 

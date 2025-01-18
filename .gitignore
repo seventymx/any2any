@@ -1,0 +1,13 @@
+# Ignore Rider files
+.idea/
+*.DotSettings.*
+
+# Nix build output
+result
+
+# Dotnet artifacts
+bin/
+obj/
+
+# Node modules
+node_modules/
