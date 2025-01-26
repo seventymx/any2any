@@ -1,0 +1,76 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * Author: Steffen70 <steffen@seventy.mx>
+ * Creation Date: 2025-01-26
+ *
+ * Contributors:
+ * - Contributor Name <contributor@example.com>
+ */
+
+syntax = "proto3";
+
+option csharp_namespace = "Any2Any.Prototype";
+
+package demo_service;
+
+import "google/protobuf/empty.proto";
+
+service DemoService {
+  // Upload one or multiple source files
+  rpc UploadSourceFiles(stream FileChunk) returns (google.protobuf.Empty);
+
+  // Get an array of column names - from the source files
+  rpc GetColumnNames(google.protobuf.Empty) returns (ColumnNamesResponse);
+
+  // Set the column name to link files with
+  rpc SetLinkedColumn(LinkedColumnRequest) returns (google.protobuf.Empty);
+
+  // Get log output as a stream
+  rpc GetLogStream(google.protobuf.Empty) returns (stream LogMessage);
+
+  // Download the generated demo export file as a stream
+  rpc DownloadDemoExport(FileDownloadRequest) returns (stream FileChunk);
+}
+
+// Message for uploading file chunks
+message FileChunk {
+  // The binary content of the file chunk
+  bytes content = 1;
+  // The name of the file
+  string fileName = 2;
+  // The file's type (e.g., application/pdf, image/png)
+  string fileType = 3;
+  // Indicates whether this is the last chunk
+  bool isFinalChunk = 4;
+}
+
+// Response containing column names
+message ColumnNamesResponse {
+  // List of available column names
+  repeated string columnNames = 1;
+}
+
+// Request for setting the linked column
+message LinkedColumnRequest {
+  // The column name to link files with
+  string columnName = 1;
+}
+
+// Message for log streaming
+message LogMessage {
+  // Timestamp of the log entry
+  string timestamp = 1;
+  // Log level (e.g., INFO, ERROR)
+  string level = 2;
+  // The log message
+  string message = 3;
+}
+
+// Request for downloading a file
+message FileDownloadRequest {
+  // ID of the file to download
+  string fileId = 1;
+}

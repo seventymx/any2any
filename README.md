@@ -17,14 +17,14 @@ nix develop
 # Ensure you open the root directory in your editor for the configurations to apply correctly.
 code .
 
+# Open the solution in JetBrains Rider
+riderdev
+
 # Navigate to the backend directory
 cd backend
 
-# Start the backend server - Prototype CLI tool
+# Start the backend server
 dotnet run
-
-# Open the project in JetBrains Rider
-riderdev
 ```
 
 The application uses SQLite as its database, combined with EF Core (code-first) for schema management. The database is created and seeded automatically when the application starts.

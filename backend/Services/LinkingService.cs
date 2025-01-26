@@ -12,20 +12,17 @@
 
 using Any2Any.Prototype.Model;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace Any2Any.Prototype.Services;
 
-public class LinkingService(Any2AnyDbContext dbContext, ILogger<LinkingService> logger, CancellationTokenSource cancellationTokenSource)
+public class LinkingService(Any2AnyDbContext dbContext, ILogger<LinkingService> logger)
 {
-    private CancellationToken CancellationToken => cancellationTokenSource.Token;
-
-    public async Task LinkEntitiesAsync(string propertyName)
+    public async Task LinkEntitiesAsync(string propertyName, CancellationToken cancellationToken)
     {
         var properties = await dbContext.EntityProperties
             .Include(p => p.Entity)
             .Where(p => p.Name == propertyName)
-            .ToListAsync(CancellationToken);
+            .ToListAsync(cancellationToken);
 
         if (properties.Count < 2)
         {
@@ -54,25 +51,25 @@ public class LinkingService(Any2AnyDbContext dbContext, ILogger<LinkingService> 
             linkedRecords.AddRange(links);
         }
 
-        await dbContext.RecordLinks.AddRangeAsync(linkedRecords, CancellationToken);
-        await dbContext.SaveChangesAsync(CancellationToken);
+        await dbContext.RecordLinks.AddRangeAsync(linkedRecords, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Entities successfully linked.");
     }
 
 
-    public async Task CreateRecordGroupsAsync()
+    public async Task CreateRecordGroupsAsync(CancellationToken cancellationToken)
     {
         var allRecords = await dbContext.Records
             .Include(r => r.Values)
             .ThenInclude(v => v.EntityProperty)
-            .ToListAsync(CancellationToken);
+            .ToListAsync(cancellationToken);
 
         var hasCreatedGroups = false;
 
         foreach (var record in allRecords)
         {
-            CancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Check if the record is already part of a group
             if (dbContext.RecordGroupLinks.Any(rgl => rgl.RecordId == record.Id))
@@ -97,7 +94,7 @@ public class LinkingService(Any2AnyDbContext dbContext, ILogger<LinkingService> 
                 var currentRecord = await dbContext.Records
                     .Include(r => r.Values)
                     .ThenInclude(v => v.EntityProperty)
-                    .FirstOrDefaultAsync(r => r.Id == currentRecordId, CancellationToken);
+                    .FirstOrDefaultAsync(r => r.Id == currentRecordId, cancellationToken);
 
                 if (currentRecord == null) continue;
 
@@ -119,7 +116,7 @@ public class LinkingService(Any2AnyDbContext dbContext, ILogger<LinkingService> 
             hasCreatedGroups = true;
 
             dbContext.RecordGroups.Add(recordGroup);
-            await dbContext.SaveChangesAsync(CancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             var recordGroupLinks = allLinkedRecords.Select(linkedRecord => new RecordGroupLink
             {
@@ -128,7 +125,7 @@ public class LinkingService(Any2AnyDbContext dbContext, ILogger<LinkingService> 
             });
 
             dbContext.RecordGroupLinks.AddRange(recordGroupLinks);
-            await dbContext.SaveChangesAsync(CancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         if (!hasCreatedGroups)

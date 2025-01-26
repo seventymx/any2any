@@ -10,125 +10,138 @@
  * - Contributor Name <contributor@example.com>
  */
 
+using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
+using Any2Any.Prototype.Extensions;
+using Any2Any.Prototype.Model;
+using Any2Any.Prototype.Model.Logger;
 using Any2Any.Prototype.Services;
-using ClosedXML.Excel;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.InMemory;
 
 namespace Any2Any.Prototype;
 
 public class Program
 {
+    private const string CertificateSettingsEnvironmentVariable = "CERTIFICATE_SETTINGS";
+    private const string ApiPortEnvironmentVariable = "API_PORT";
+
+    private const string CorsPolicyName = "ClientPolicy";
+
+    internal const string HttpClientName = "CustomHttpClient";
+
     public static void Main(string[] args)
     {
-        var host = Host.CreateDefaultBuilder().ConfigureServices((_, services) =>
+        var builder = WebApplication.CreateBuilder(args);
+        
+        // Set up an in-memory log sink
+        builder.Host.UseSerilog((_, configuration) =>
         {
-            services.AddLogging(b =>
-            {
-                b.AddConsole();
-                b.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
-            });
-            services.AddSingleton<CancellationTokenSource>();
-            services.AddDbContext<Any2AnyDbContext>(b => b.UseLazyLoadingProxies().UseSqlite("Data Source=any2any.db"));
-            services.AddTransient<FileProcessingService>();
-            services.AddTransient<LinkingService>();
-            services.AddTransient<ExportService>();
-        }).Build();
+            configuration
+                .MinimumLevel.Debug()
+                // Override for EF Core logs
+                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning) 
+                // Log to the console for development
+                .WriteTo.Console()
+                // Collect logs in memory
+                .WriteTo.InMemory(LogEventLevel.Information);
+        });
 
-        using var scope = host.Services.CreateScope();
-        var services = scope.ServiceProvider;
+        // Get the certificate settings from the environment variable
+        var certSettings = JsonSerializer.Deserialize<CertificateSettings>(
+            Environment.GetEnvironmentVariable(CertificateSettingsEnvironmentVariable) ?? throw new InvalidOperationException($"{CertificateSettingsEnvironmentVariable} environment variable not set"),
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+        )!;
 
-        // Handle Ctrl+C
-        var cancellationTokenSource = services.GetRequiredService<CancellationTokenSource>();
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        Console.CancelKeyPress += (_, e) =>
+        // Get the API port from the environment variable
+        var apiPort = int.Parse(Environment.GetEnvironmentVariable(ApiPortEnvironmentVariable) ?? throw new InvalidOperationException($"{ApiPortEnvironmentVariable} environment variable not set"));
+
+        // Configure the Kestrel server with the certificate and the API port
+        builder.WebHost.ConfigureKestrel(options => options.ListenLocalhost(apiPort, listenOptions =>
         {
-            // Prevent immediate termination
-            e.Cancel = true;
+            listenOptions.UseHttps(new X509Certificate2($"{certSettings.Path}.pfx", certSettings.Password));
+            // Enable HTTP/2 and HTTP/1.1 for gRPC-Web compatibility
+            listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
+        }));
 
-            logger.LogInformation("Terminating application...");
-            cancellationTokenSource.Cancel();
-        };
-
-        try
+        // Allow all origins
+        builder.Services.AddCors(o => o.AddPolicy(CorsPolicyName, policyBuilder =>
         {
-            // Run the main application logic
-            MainAsync(services).GetAwaiter().GetResult();
-        }
-        catch (OperationCanceledException)
+            policyBuilder
+                // Allow all ports on localhost
+                .SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
+                // Allow all methods and headers
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                // Expose the gRPC-Web headers
+                .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
+        }));
+
+        builder.Services.AddGrpc();
+
+        builder.Services.AddSingleton(certSettings);
+
+        // Add custom HttpClient with the certificate handler to talk to the gRPC services
+        builder.Services.AddHttpClient(HttpClientName).ConfigurePrimaryHttpMessageHandler(serviceProvider =>
         {
-            // Ignore
-        }
-        catch (Exception ex)
+            var certificateSettings = serviceProvider.GetRequiredService<CertificateSettings>();
+            var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+
+            // Load the certificate from the environment variable
+            var certificate = new X509Certificate2($"{certificateSettings.Path}.crt");
+
+            // Expected thumbprint and issuer of the certificate for validation
+            var expectedThumbprint = certificate.Thumbprint;
+            var expectedIssuer = certificate.Issuer;
+
+            logger.LogInformation($"Creating custom HttpClient with certificate handler for {expectedIssuer}");
+
+            // Create the gRPC channels and clients with the custom certificate handler
+            var handler = new HttpClientHandler();
+            handler.ClientCertificates.Add(certificate);
+
+            handler.ServerCertificateCustomValidationCallback = (httpRequestMessage, cert, certChain, policyErrors) =>
+                cert?.Issuer == expectedIssuer && cert.Thumbprint == expectedThumbprint;
+
+            return handler;
+        });
+
+        // Add the custom HttpClient to the service provider
+        builder.Services.AddTransient(serviceProvider =>
         {
-            logger.LogError(ex, "An unhandled exception occurred during execution.");
-        }
-    }
+            var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+            var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
 
-    private static async Task MainAsync(IServiceProvider serviceProvider)
-    {
-        await using var dbContext = serviceProvider.GetRequiredService<Any2AnyDbContext>();
-        var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Creating custom HttpClient with certificate handler");
 
-        var cancellationToken = serviceProvider.GetRequiredService<CancellationTokenSource>().Token;
+            return httpClientFactory.CreateClient(HttpClientName);
+        });
 
-        // Ensure database is created
-        await dbContext.Database.EnsureDeletedAsync(cancellationToken);
-        await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        // Add the database context and services
+        builder.Services.AddDbContext<Any2AnyDbContext>(b => b.UseLazyLoadingProxies().UseSqlite("Data Source=any2any.db"));
+        builder.Services.AddTransient<FileProcessingService>();
+        builder.Services.AddTransient<LinkingService>();
+        builder.Services.AddTransient<ExportService>();
 
-        // Directory containing the source files
-        const string sourceDir = "./source_files";
+        var app = builder.Build();
 
-        if (!Directory.Exists(sourceDir))
-        {
-            logger.LogError($"Source directory '{sourceDir}' does not exist.");
-            return;
-        }
+        // Configure the HTTP request pipeline.
 
-        var files = Directory.GetFiles(sourceDir, "*.xlsx");
-        if (files.Length == 0)
-        {
-            logger.LogWarning($"No Excel files found in the directory: {sourceDir}");
-            return;
-        }
+        // Enable the HTTPS redirection - only use HTTPS
+        app.UseHttpsRedirection();
 
-        var fileProcessingService = serviceProvider.GetRequiredService<FileProcessingService>();
+        // Enable CORS - allow all origins and add gRPC-Web headers
+        app.UseCors(CorsPolicyName);
 
-        // Load and process Excel files
-        foreach (var file in Directory.GetFiles(sourceDir, "*.xlsx"))
-        {
-            logger.LogInformation($"Processing file: {file}");
-            await fileProcessingService.ProcessExcelFileAsync(file);
-        }
+        // Enable gRPC-Web for all services
+        app.UseGrpcWeb(new() { DefaultEnabled = true });
 
-        // Link tables via the "Name" column
-        var linkingService = serviceProvider.GetRequiredService<LinkingService>();
-        await linkingService.LinkEntitiesAsync("Name");
+        // Add all services in the Services namespace
+        app.MapGrpcServices();
 
-        // Create record groups
-        await linkingService.CreateRecordGroupsAsync();
-
-        // Generate a demo export
-        var exportService = serviceProvider.GetRequiredService<ExportService>();
-        var demoExport = await exportService.CreateDemoExportAsync();
-
-        if (demoExport == null)
-        {
-            logger.LogInformation("Demo export could not be created.");
-            return;
-        }
-
-        // Check for cancellation before saving the export
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Save the demo export as .xlsx file
-        using var workbook = new XLWorkbook();
-        workbook.Worksheets.Add(demoExport);
-        workbook.SaveAs("demo_export.xlsx");
-
-        logger.LogInformation($"Processed {files.Length} file(s) from '{sourceDir}'.");
-        logger.LogInformation("Demo export successfully created.");
+        app.Run();
     }
 }

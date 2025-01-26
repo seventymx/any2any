@@ -12,24 +12,20 @@
 
 using Any2Any.Prototype.Model;
 using ClosedXML.Excel;
-using Microsoft.Extensions.Logging;
 
 namespace Any2Any.Prototype.Services;
 
-public class FileProcessingService(Any2AnyDbContext dbContext, ILogger<FileProcessingService> logger, CancellationTokenSource cancellationTokenSource)
+public class FileProcessingService(Any2AnyDbContext dbContext, ILogger<FileProcessingService> logger)
 {
-    private CancellationToken CancellationToken => cancellationTokenSource.Token;
-
-    public async Task ProcessExcelFileAsync(string filePath)
+    public async Task ProcessExcelFileAsync(string fileName, Stream fileStream, CancellationToken cancellationToken)
     {
-        using var workbook = new XLWorkbook(filePath);
+        using var workbook = new XLWorkbook(fileStream);
 
         foreach (var sheet in workbook.Worksheets)
         {
-            CancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
-            var fileInfo = new FileInfo(filePath);
-            var entityName = $"{fileInfo.Name.Replace(fileInfo.Extension, string.Empty)}.{sheet.Name}";
+            var entityName = $"{fileName}.{sheet.Name}";
             logger.LogInformation($"Processing sheet: {entityName}");
 
             // Load table data
@@ -76,6 +72,6 @@ public class FileProcessingService(Any2AnyDbContext dbContext, ILogger<FileProce
             dbContext.Entities.Add(entity);
         }
 
-        await dbContext.SaveChangesAsync(CancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

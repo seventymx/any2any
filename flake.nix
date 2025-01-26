@@ -27,6 +27,7 @@
 
         buildDependencies = [
           unstable.dotnet-sdk_8
+          unstable.protobuf
         ];
 
         licenseHeader = ''
@@ -37,6 +38,13 @@
           file, You can obtain one at https://mozilla.org/MPL/2.0/.
           ===================================================================
           EOL
+        '';
+
+        certificateSettings = ''
+          {
+            "path": "cert/localhost",
+            "password": "Catapult0-Carpool4"
+          }
         '';
       in
       {
@@ -49,6 +57,9 @@
 
           shellHook = ''
             cat ${licenseHeader}
+
+            export API_PORT=8443
+            export CERTIFICATE_SETTINGS='${certificateSettings}'
           '';
         };
 
@@ -56,11 +67,14 @@
           pname = "Any2Any";
           version = "0.1.0";
 
-          src = ./backend;
+          src = ./.;
 
           buildInputs = buildDependencies;
 
           configureNuget = ''
+            # Navigate to the project directory
+            cd backend
+
             # Clear NuGet cache
             dotnet nuget locals all --clear
 

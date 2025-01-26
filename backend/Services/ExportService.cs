@@ -12,15 +12,12 @@
 
 using System.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace Any2Any.Prototype.Services;
 
-public class ExportService(Any2AnyDbContext dbContext, ILogger<ExportService> logger, CancellationTokenSource cancellationTokenSource)
+public class ExportService(Any2AnyDbContext dbContext, ILogger<ExportService> logger)
 {
-    private CancellationToken CancellationToken => cancellationTokenSource.Token;
-
-    public async Task<DataTable?> CreateDemoExportAsync()
+    public async Task<DataTable?> CreateDemoExportAsync(CancellationToken cancellationToken)
     {
         // Record groups including linked records, values and properties
         var recordGroups = await dbContext.RecordGroups
@@ -30,7 +27,7 @@ public class ExportService(Any2AnyDbContext dbContext, ILogger<ExportService> lo
             .ThenInclude(v => v.EntityProperty)
             // Enable split queries to avoid loading all records at once - provides a good balance of performance and simplicity for deeply nested relationships
             .AsSplitQuery()
-            .ToListAsync(CancellationToken);
+            .ToListAsync(cancellationToken);
 
         if (recordGroups.Count == 0)
         {
@@ -50,7 +47,7 @@ public class ExportService(Any2AnyDbContext dbContext, ILogger<ExportService> lo
 
         foreach (var recordGroup in recordGroups)
         {
-            CancellationToken.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
             var userEntityRecord = recordGroup.RecordGroupLinks
                 .Select(rgl => rgl.Record)
