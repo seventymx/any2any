@@ -37,13 +37,14 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="../cert/*.pfx">
+        <Content Include="../cert/*.crt" />
+        <Content Include="../cert/*.pfx" />
+    </ItemGroup>
+
+    <ItemDefinitionGroup>
+        <Content>
             <Link>cert/%(Filename)%(Extension)</Link>
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
-    </ItemGroup>
-
-    <ItemGroup>
-        <ProjectReference Include="..\cli_client\cli_client.csproj"/>
-    </ItemGroup>
+    </ItemDefinitionGroup>
 </Project> 

@@ -49,6 +49,9 @@ public class DemoService(
         }
 
         if (fileStreams.Any(fs => fs.fileType != "xlsx")) throw new RpcException(new(StatusCode.InvalidArgument, "Invalid file type. Expected .xlsx"));
+        
+        // TODO: initiate new mapping process - create seperate databases
+        await dbContext.Database.EnsureCreatedAsync(context.CancellationToken);
 
         foreach (var (stream, fileName, _) in fileStreams) await fileProcessingService.ProcessExcelFileAsync(fileName, stream, context.CancellationToken);
 
@@ -145,6 +148,8 @@ public class DemoService(
         {
             var fileChunk = new FileChunk
             {
+                FileName = "demo_export",
+                FileType = "xlsx",
                 Content = ByteString.CopyFrom(buffer, 0, bytesRead),
                 IsFinalChunk = bytesRead < buffer.Length
             };

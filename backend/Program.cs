@@ -34,6 +34,9 @@ public class Program
 
     public static void Main(string[] args)
     {
+        // Working directory is not always the same as the executable directory - base directory is more reliable
+        var basePath = AppContext.BaseDirectory;
+
         var builder = WebApplication.CreateBuilder(args);
 
         // Set up an in-memory log sink
@@ -61,7 +64,12 @@ public class Program
         // Configure the Kestrel server with the certificate and the API port
         builder.WebHost.ConfigureKestrel(options => options.ListenLocalhost(apiPort, listenOptions =>
         {
-            listenOptions.UseHttps(new X509Certificate2($"{certSettings.Path}.pfx", certSettings.Password));
+            var certificatePath = Path.Combine(basePath, $"{certSettings.Path}.pfx");
+
+            var logger = listenOptions.ApplicationServices.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation($"Using certificate from {certificatePath}");
+
+            listenOptions.UseHttps(new X509Certificate2(certificatePath, certSettings.Password));
             // Enable HTTP/2 and HTTP/1.1 for gRPC-Web compatibility
             listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
         }));
@@ -89,8 +97,11 @@ public class Program
             var certificateSettings = serviceProvider.GetRequiredService<CertificateSettings>();
             var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
 
+            var publicKeyPath = Path.Combine(basePath, $"{certificateSettings.Path}.crt");
+            logger.LogInformation($"Using public key from {publicKeyPath}");
+            
             // Load the certificate from the environment variable
-            var certificate = new X509Certificate2($"{certificateSettings.Path}.crt");
+            var certificate = new X509Certificate2(publicKeyPath);
 
             // Expected thumbprint and issuer of the certificate for validation
             var expectedThumbprint = certificate.Thumbprint;
@@ -120,7 +131,7 @@ public class Program
         });
 
         // Add the database context and services
-        builder.Services.AddDbContext<Any2AnyDbContext>(b => b.UseLazyLoadingProxies().UseSqlite("Data Source=any2any.db"));
+        builder.Services.AddDbContext<Any2AnyDbContext>(b => b.UseLazyLoadingProxies().UseSqlite($"Data Source={Path.Combine(basePath, "any2any.db")}"));
         builder.Services.AddTransient<FileProcessingService>();
         builder.Services.AddTransient<LinkingService>();
         builder.Services.AddTransient<ExportService>();

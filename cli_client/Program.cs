@@ -27,9 +27,13 @@ public class Program
     private const string ApiPortEnvironmentVariable = "API_PORT";
 
     private const string HttpClientName = "CustomHttpClient";
+    
+    private const string SourceDir = "source_files";
 
     public static void Main(string[] args)
     {
+        var basePath = AppContext.BaseDirectory;
+
         // Get the API port from the environment variable
         var apiPort = int.Parse(Environment.GetEnvironmentVariable(ApiPortEnvironmentVariable) ?? throw new InvalidOperationException($"{ApiPortEnvironmentVariable} environment variable not set"));
         var baseAddress = new Uri($"https://localhost:{apiPort}/");
@@ -46,8 +50,10 @@ public class Program
             {
                 var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
 
+                var publicKeyPath = Path.Combine(basePath, "cert", "localhost.crt");
+
                 // Load the certificate
-                var certificate = new X509Certificate2("./cert/localhost.crt");
+                var certificate = new X509Certificate2(publicKeyPath);
 
                 // Expected thumbprint and issuer of the certificate for validation
                 var expectedThumbprint = certificate.Thumbprint;
@@ -84,7 +90,8 @@ public class Program
 
                 logger.LogInformation($"Creating gRPC channel for address: {baseAddress}");
 
-                return GrpcChannel.ForAddress(baseAddress, new() { HttpClient = httpClient });
+                var channel = GrpcChannel.ForAddress(baseAddress, new() { HttpClient = httpClient });
+                return new DemoClient(channel);
             });
         }).Build();
 
@@ -127,24 +134,24 @@ public class Program
         var demoClient = serviceProvider.GetRequiredService<DemoClient>();
 
         // Log server log in client log
-        _ = Task.Run(async () =>
-        {
-            await foreach (var logMessage in demoClient.GetLogStream(new()).ResponseStream.ReadAllAsync(cancellationToken)) logger.LogInformation("[Server] {Timestamp} [{Level}] {Message}", logMessage.Timestamp, logMessage.Level, logMessage.Message);
-        }, cancellationToken);
+        // _ = Task.Run(async () =>
+        // {
+        //     await foreach (var logMessage in demoClient.GetLogStream(new()).ResponseStream.ReadAllAsync(cancellationToken)) logger.LogInformation("[Server] {Timestamp} [{Level}] {Message}", logMessage.Timestamp, logMessage.Level, logMessage.Message);
+        // }, cancellationToken);
+        
+        var basePath = AppContext.BaseDirectory;
+        var sourcePath = Path.Combine(basePath, SourceDir);
 
-        // Directory containing the source files
-        const string sourceDir = "./source_files";
-
-        if (!Directory.Exists(sourceDir))
+        if (!Directory.Exists(sourcePath))
         {
-            logger.LogError($"Source directory '{sourceDir}' does not exist.");
+            logger.LogError($"Source directory '{sourcePath}' does not exist.");
             return;
         }
 
-        var files = Directory.GetFiles(sourceDir, "*.xlsx");
+        var files = Directory.GetFiles(sourcePath, "*.xlsx");
         if (files.Length == 0)
         {
-            logger.LogWarning($"No Excel files found in the directory: {sourceDir}");
+            logger.LogWarning($"No Excel files found in the directory: {SourceDir}");
             return;
         }
 
@@ -152,7 +159,7 @@ public class Program
 
         await demoClient.SetLinkedColumnAsync(new() { ColumnName = "Name" });
 
-        await DownloadDemoExportAsync(demoClient, "./demo_export.xlsx", logger, cancellationToken);
+        await DownloadDemoExportAsync(demoClient, basePath, logger, cancellationToken);
     }
 
     /// <summary>
@@ -177,7 +184,7 @@ public class Program
                 var chunk = new FileChunk
                 {
                     Content = ByteString.CopyFrom(buffer, 0, bytesRead),
-                    FileName = Path.GetFileName(file),
+                    FileName = Path.GetFileNameWithoutExtension(file),
                     FileType = "xlsx",
                     IsFinalChunk = false
                 };
@@ -188,7 +195,7 @@ public class Program
             // Send final chunk
             await call.RequestStream.WriteAsync(new()
             {
-                FileName = Path.GetFileName(file),
+                FileName = Path.GetFileNameWithoutExtension(file),
                 FileType = "xlsx",
                 IsFinalChunk = true
             }, cancellationToken);
@@ -205,15 +212,38 @@ public class Program
     /// <summary>
     ///     Downloads the demo export file from the backend and saves it locally.
     /// </summary>
-    private static async Task DownloadDemoExportAsync(DemoClient demoClient, string outputPath, ILogger logger, CancellationToken cancellationToken)
+    private static async Task DownloadDemoExportAsync(DemoClient demoClient, string outputDirectory, ILogger logger, CancellationToken cancellationToken)
     {
         logger.LogInformation("Downloading demo export...");
 
         using var call = demoClient.DownloadDemoExport(new(), cancellationToken: cancellationToken);
 
+        // Get the first chunk to determine the file name and type
+        if (!await call.ResponseStream.MoveNext(cancellationToken))
+        {
+            logger.LogError("No data received from the server.");
+            return;
+        }
+
+        var firstChunk = call.ResponseStream.Current;
+
+        // Ensure the output directory exists
+        Directory.CreateDirectory(outputDirectory);
+
+        // Construct the output file path
+        var outputFileName = $"{firstChunk.FileName}.{firstChunk.FileType}";
+        var outputPath = Path.Combine(outputDirectory, outputFileName);
+
         await using var fileStream = File.Create(outputPath);
 
-        await foreach (var chunk in call.ResponseStream.ReadAllAsync(cancellationToken)) await fileStream.WriteAsync(chunk.Content.ToByteArray(), cancellationToken);
+        // Write the first chunk manually before reading the rest
+        await fileStream.WriteAsync(firstChunk.Content.ToByteArray(), cancellationToken);
+
+        // Process the remaining chunks
+        await foreach (var chunk in call.ResponseStream.ReadAllAsync(cancellationToken))
+        {
+            await fileStream.WriteAsync(chunk.Content.ToByteArray(), cancellationToken);
+        }
 
         logger.LogInformation($"Demo export saved successfully: {outputPath}");
     }
