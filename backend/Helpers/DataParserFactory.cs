@@ -10,9 +10,10 @@
  * - Contributor Name <contributor@example.com>
  */
 
-using Any2Any.Prototype.Model.Parser;
+using Any2Any.Prototype.Helpers.Parser;
+using Any2Any.Prototype.Model;
 
-namespace Any2Any.Prototype.Model;
+namespace Any2Any.Prototype.Helpers;
 
 /// <summary>
 ///     Base class for serialization and deserialization strategies.

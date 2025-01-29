@@ -28,9 +28,6 @@ service Demo {
   // Set the column name to link files with
   rpc SetLinkedColumn(LinkedColumnRequest) returns (google.protobuf.Empty);
 
-  // Get log output as a stream
-  rpc GetLogStream(google.protobuf.Empty) returns (stream LogMessage);
-
   // Download the generated demo export file as a stream
   rpc DownloadDemoExport(FileDownloadRequest) returns (stream FileChunk);
 }
@@ -57,16 +54,6 @@ message ColumnNamesResponse {
 message LinkedColumnRequest {
   // The column name to link files with
   string columnName = 1;
-}
-
-// Message for log streaming
-message LogMessage {
-  // Timestamp of the log entry
-  string timestamp = 1;
-  // Log level (e.g., INFO, ERROR)
-  string level = 2;
-  // The log message
-  string message = 3;
 }
 
 // Request for downloading a file

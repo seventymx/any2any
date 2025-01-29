@@ -10,15 +10,13 @@
  * - Contributor Name <contributor@example.com>
  */
 
-using System.Text;
-
-namespace Any2Any.Prototype.Model.Parser;
+namespace Any2Any.Prototype.Helpers.Parser;
 
 /// <summary>
-///     String parser implementation.
+///     DateTime parser implementation.
 /// </summary>
-public class StringParser : IDataParser
+public class DateTimeParser : IDataParser
 {
-    public object Deserialize(string data) => Encoding.UTF8.GetString(Convert.FromBase64String(data));
-    public string Serialize(object value) => Convert.ToBase64String(Encoding.UTF8.GetBytes((string)value));
+    public object Deserialize(string data) => DateTime.FromBinary(BitConverter.ToInt64(Convert.FromBase64String(data)));
+    public string Serialize(object value) => Convert.ToBase64String(BitConverter.GetBytes(((DateTime)value).ToBinary()));
 }

@@ -10,6 +10,7 @@
  * - Contributor Name <contributor@example.com>
  */
 
+using Any2Any.Prototype.Helpers;
 using Any2Any.Prototype.Model;
 using Microsoft.EntityFrameworkCore;
 

@@ -10,13 +10,13 @@
  * - Contributor Name <contributor@example.com>
  */
 
-namespace Any2Any.Prototype.Model;
+namespace Any2Any.Prototype.Helpers;
 
-public class CertificateSettings
+/// <summary>
+///     Interface for data serialization and deserialization strategies.
+/// </summary>
+public interface IDataParser
 {
-    // The path to the certificate file (without file extension)
-    public string Path { get; init; } = null!;
-
-    // The password for the certificate file
-    public string Password { get; init; } = null!;
+    object Deserialize(string data);
+    string Serialize(object value);
 }

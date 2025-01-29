@@ -13,14 +13,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace Any2Any.Prototype;
+namespace Any2Any.Prototype.Helpers;
 
-public class Any2AnyDbContextFactory : IDesignTimeDbContextFactory<Any2AnyDbContext>
+public class TemporaryDbContextFactory : IDesignTimeDbContextFactory<Any2AnyDbContext>
 {
     public Any2AnyDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<Any2AnyDbContext>()
-            .UseSqlite("Data Source=any2any.db")
+            .UseSqlite($"Data Source={Path.Combine(AppContext.BaseDirectory, "any2any.db")}")
             .Options;
 
         return new(options);

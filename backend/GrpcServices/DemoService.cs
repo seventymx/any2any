@@ -11,12 +11,13 @@
  */
 
 using Any2Any.Prototype.Common;
+using Any2Any.Prototype.Helpers;
+using Any2Any.Prototype.Middleware;
 using Any2Any.Prototype.Services;
 using ClosedXML.Excel;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
-using Serilog.Sinks.InMemory;
 
 namespace Any2Any.Prototype.GrpcServices;
 
@@ -49,8 +50,7 @@ public class DemoService(
         }
 
         if (fileStreams.Any(fs => fs.fileType != "xlsx")) throw new RpcException(new(StatusCode.InvalidArgument, "Invalid file type. Expected .xlsx"));
-        
-        // TODO: initiate new mapping process - create seperate databases
+
         await dbContext.Database.EnsureCreatedAsync(context.CancellationToken);
 
         foreach (var (stream, fileName, _) in fileStreams) await fileProcessingService.ProcessExcelFileAsync(fileName, stream, context.CancellationToken);
@@ -82,45 +82,7 @@ public class DemoService(
 
         return new();
     }
-
-    /// <summary>
-    ///     Streams log messages to the client.
-    /// </summary>
-    public override async Task GetLogStream(Empty request, IServerStreamWriter<LogMessage> responseStream, ServerCallContext context)
-    {
-        // Access the Serilog InMemorySink instance
-        var logEvents = InMemorySink.Instance.LogEvents;
-
-        // Keep track of the last processed log index
-        var lastProcessedIndex = 0;
-
-        while (!context.CancellationToken.IsCancellationRequested)
-        {
-            // Get new log events since the last processed index
-            var newLogEvents = logEvents.Skip(lastProcessedIndex).ToList();
-
-            var formatedLogEvents = newLogEvents.Select(logEvent => new LogMessage
-            {
-                // ISO 8601 format
-                Timestamp = logEvent.Timestamp.ToString("o"),
-                Level = logEvent.Level.ToString(),
-                // Render the log message
-                Message = logEvent.RenderMessage()
-            });
-
-            foreach (var logMessage in formatedLogEvents)
-                // Stream the log message to the client
-                await responseStream.WriteAsync(logMessage, context.CancellationToken);
-
-            // Update the last processed index
-            lastProcessedIndex += newLogEvents.Count;
-
-            // Delay briefly to avoid busy-waiting
-            await Task.Delay(100, context.CancellationToken);
-        }
-    }
-
-
+    
     /// <summary>
     ///     Downloads a demo export as a stream of file chunks.
     /// </summary>
@@ -155,5 +117,23 @@ public class DemoService(
             };
             await responseStream.WriteAsync(fileChunk, context.CancellationToken);
         }
+
+        await CleanupMappingProcessAsync(context);
+    }
+
+    /// <summary>
+    ///     Cleans up the database and MappingProcessId after export completion.
+    /// </summary>
+    private async Task CleanupMappingProcessAsync(ServerCallContext context)
+    {
+        // Retrieve the MappingProcessId
+        var mappingIdHeader = context.RequestHeaders.FirstOrDefault(h => h.Key == MappingProcessMiddleware.MappingProcessIdHeaderKey)?.Value;
+        if (!Guid.TryParse(mappingIdHeader, out _))
+        {
+            logger.LogWarning("No valid MappingProcessId found. Skipping cleanup.");
+            return;
+        }
+
+        await dbContext.Database.EnsureDeletedAsync(context.CancellationToken);
     }
 }

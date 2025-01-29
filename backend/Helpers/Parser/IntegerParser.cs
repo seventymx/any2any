@@ -10,7 +10,7 @@
  * - Contributor Name <contributor@example.com>
  */
 
-namespace Any2Any.Prototype.Model.Parser;
+namespace Any2Any.Prototype.Helpers.Parser;
 
 /// <summary>
 ///     Integer parser implementation.

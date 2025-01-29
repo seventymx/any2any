@@ -11,9 +11,11 @@
  */
 
 using System.Security.Cryptography.X509Certificates;
+using Any2Any.Prototype.CliClient.Helpers;
 using Any2Any.Prototype.Common;
 using Google.Protobuf;
 using Grpc.Core;
+using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -27,7 +29,7 @@ public class Program
     private const string ApiPortEnvironmentVariable = "API_PORT";
 
     private const string HttpClientName = "CustomHttpClient";
-    
+
     private const string SourceDir = "source_files";
 
     public static void Main(string[] args)
@@ -40,7 +42,11 @@ public class Program
 
         var host = Host.CreateDefaultBuilder().ConfigureServices((_, services) =>
         {
-            services.AddLogging(builder => { builder.AddConsole(); });
+            services.AddLogging(loggingBuilder =>
+            {
+                loggingBuilder.AddConsole();
+                loggingBuilder.AddFilter("System.Net.Http.HttpClient.CustomHttpClient", LogLevel.Warning);
+            });
 
             // Add the cancellation token source to handle Ctrl+C
             services.AddSingleton<CancellationTokenSource>();
@@ -82,6 +88,8 @@ public class Program
                 return httpClientFactory.CreateClient(HttpClientName);
             });
 
+            services.AddSingleton<MappingProcessInterceptor>();
+
             // Add the demo client as singleton to the service provider
             services.AddSingleton(serviceProvider =>
             {
@@ -91,7 +99,11 @@ public class Program
                 logger.LogInformation($"Creating gRPC channel for address: {baseAddress}");
 
                 var channel = GrpcChannel.ForAddress(baseAddress, new() { HttpClient = httpClient });
-                return new DemoClient(channel);
+
+                var interceptor = serviceProvider.GetRequiredService<MappingProcessInterceptor>();
+                var callInvoker = channel.Intercept(interceptor);
+
+                return new DemoClient(callInvoker);
             });
         }).Build();
 
@@ -129,16 +141,6 @@ public class Program
     {
         var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
 
-        var cancellationToken = serviceProvider.GetRequiredService<CancellationTokenSource>().Token;
-
-        var demoClient = serviceProvider.GetRequiredService<DemoClient>();
-
-        // Log server log in client log
-        // _ = Task.Run(async () =>
-        // {
-        //     await foreach (var logMessage in demoClient.GetLogStream(new()).ResponseStream.ReadAllAsync(cancellationToken)) logger.LogInformation("[Server] {Timestamp} [{Level}] {Message}", logMessage.Timestamp, logMessage.Level, logMessage.Message);
-        // }, cancellationToken);
-        
         var basePath = AppContext.BaseDirectory;
         var sourcePath = Path.Combine(basePath, SourceDir);
 
@@ -154,6 +156,9 @@ public class Program
             logger.LogWarning($"No Excel files found in the directory: {SourceDir}");
             return;
         }
+
+        var demoClient = serviceProvider.GetRequiredService<DemoClient>();
+        var cancellationToken = serviceProvider.GetRequiredService<CancellationTokenSource>().Token;
 
         await UploadFilesAsync(demoClient, files, logger, cancellationToken);
 
@@ -240,10 +245,7 @@ public class Program
         await fileStream.WriteAsync(firstChunk.Content.ToByteArray(), cancellationToken);
 
         // Process the remaining chunks
-        await foreach (var chunk in call.ResponseStream.ReadAllAsync(cancellationToken))
-        {
-            await fileStream.WriteAsync(chunk.Content.ToByteArray(), cancellationToken);
-        }
+        await foreach (var chunk in call.ResponseStream.ReadAllAsync(cancellationToken)) await fileStream.WriteAsync(chunk.Content.ToByteArray(), cancellationToken);
 
         logger.LogInformation($"Demo export saved successfully: {outputPath}");
     }

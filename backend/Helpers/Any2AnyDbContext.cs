@@ -13,7 +13,7 @@
 using Any2Any.Prototype.Model;
 using Microsoft.EntityFrameworkCore;
 
-namespace Any2Any.Prototype;
+namespace Any2Any.Prototype.Helpers;
 
 /// <summary>
 ///     The database context for Any2Any models.

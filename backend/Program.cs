@@ -13,13 +13,10 @@
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Any2Any.Prototype.Extensions;
-using Any2Any.Prototype.Model;
+using Any2Any.Prototype.Helpers;
+using Any2Any.Prototype.Middleware;
 using Any2Any.Prototype.Services;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.EntityFrameworkCore;
-using Serilog;
-using Serilog.Events;
-using Serilog.Sinks.InMemory;
 
 namespace Any2Any.Prototype;
 
@@ -38,18 +35,12 @@ public class Program
         var basePath = AppContext.BaseDirectory;
 
         var builder = WebApplication.CreateBuilder(args);
-
-        // Set up an in-memory log sink
-        builder.Host.UseSerilog((_, configuration) =>
+        
+        builder.Services.AddLogging(loggingBuilder =>
         {
-            configuration
-                .MinimumLevel.Debug()
-                // Override for EF Core logs
-                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
-                // Log to the console for development
-                .WriteTo.Console()
-                // Collect logs in memory
-                .WriteTo.InMemory(LogEventLevel.Information);
+            loggingBuilder.AddConsole();
+            loggingBuilder.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+            loggingBuilder.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
         });
 
         // Get the certificate settings from the environment variable
@@ -99,7 +90,7 @@ public class Program
 
             var publicKeyPath = Path.Combine(basePath, $"{certificateSettings.Path}.crt");
             logger.LogInformation($"Using public key from {publicKeyPath}");
-            
+
             // Load the certificate from the environment variable
             var certificate = new X509Certificate2(publicKeyPath);
 
@@ -130,8 +121,22 @@ public class Program
             return httpClientFactory.CreateClient(HttpClientName);
         });
 
-        // Add the database context and services
-        builder.Services.AddDbContext<Any2AnyDbContext>(b => b.UseLazyLoadingProxies().UseSqlite($"Data Source={Path.Combine(basePath, "any2any.db")}"));
+        // Add HttpContextAccessor for client specific database files
+        builder.Services.AddHttpContextAccessor();
+
+        // Registers the database context as a scoped service, retrieving it from HttpContext.Items where it is set by MappingProcessMiddleware
+        builder.Services.AddScoped(serviceProvider =>
+        {
+            var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
+            var httpContext = httpContextAccessor.HttpContext;
+
+            if (httpContext?.Items[MappingProcessMiddleware.Any2AnyDbContextKey] is not Any2AnyDbContext dbContext)
+                throw new InvalidOperationException("DbContext not available in request scope.");
+
+            return dbContext;
+        });
+
+        // Add the logic services
         builder.Services.AddTransient<FileProcessingService>();
         builder.Services.AddTransient<LinkingService>();
         builder.Services.AddTransient<ExportService>();
@@ -145,6 +150,9 @@ public class Program
 
         // Enable CORS - allow all origins and add gRPC-Web headers
         app.UseCors(CorsPolicyName);
+
+        // Applies MappingProcessMiddleware to assign a unique identifier to each request and manage its database context
+        app.UseMiddleware<MappingProcessMiddleware>();
 
         // Enable gRPC-Web for all services
         app.UseGrpcWeb(new() { DefaultEnabled = true });

@@ -13,7 +13,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace Any2Any.Prototype.Model.Parser;
+namespace Any2Any.Prototype.Helpers.Parser;
 
 /// <summary>
 ///     Decimal parser implementation.
