@@ -10,8 +10,7 @@
  * - Contributor Name <contributor@example.com>
  */
 
-using System.Collections.Concurrent;
-using Any2Any.Prototype.Model.Logger;
+using Any2Any.Prototype.Common;
 using Any2Any.Prototype.Services;
 using ClosedXML.Excel;
 using Google.Protobuf;
@@ -27,7 +26,7 @@ public class DemoService(
     ExportService exportService,
     Any2AnyDbContext dbContext,
     ILogger<DemoService> logger
-) : Prototype.DemoService.DemoServiceBase
+) : Demo.DemoBase
 {
     /// <summary>
     ///     Uploads source files sent by the client and processes them.
@@ -100,17 +99,15 @@ public class DemoService(
             var formatedLogEvents = newLogEvents.Select(logEvent => new LogMessage
             {
                 // ISO 8601 format
-                Timestamp = logEvent.Timestamp.ToString("o"), 
+                Timestamp = logEvent.Timestamp.ToString("o"),
                 Level = logEvent.Level.ToString(),
                 // Render the log message
-                Message = logEvent.RenderMessage() 
+                Message = logEvent.RenderMessage()
             });
 
             foreach (var logMessage in formatedLogEvents)
-            {
                 // Stream the log message to the client
                 await responseStream.WriteAsync(logMessage, context.CancellationToken);
-            }
 
             // Update the last processed index
             lastProcessedIndex += newLogEvents.Count;

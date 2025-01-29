@@ -14,7 +14,6 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Any2Any.Prototype.Extensions;
 using Any2Any.Prototype.Model;
-using Any2Any.Prototype.Model.Logger;
 using Any2Any.Prototype.Services;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
@@ -36,14 +35,14 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        
+
         // Set up an in-memory log sink
         builder.Host.UseSerilog((_, configuration) =>
         {
             configuration
                 .MinimumLevel.Debug()
                 // Override for EF Core logs
-                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning) 
+                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
                 // Log to the console for development
                 .WriteTo.Console()
                 // Collect logs in memory
@@ -103,7 +102,7 @@ public class Program
             var handler = new HttpClientHandler();
             handler.ClientCertificates.Add(certificate);
 
-            handler.ServerCertificateCustomValidationCallback = (httpRequestMessage, cert, certChain, policyErrors) =>
+            handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
                 cert?.Issuer == expectedIssuer && cert.Thumbprint == expectedThumbprint;
 
             return handler;
@@ -113,8 +112,8 @@ public class Program
         builder.Services.AddTransient(serviceProvider =>
         {
             var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-            var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
 
+            var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
             logger.LogInformation("Creating custom HttpClient with certificate handler");
 
             return httpClientFactory.CreateClient(HttpClientName);

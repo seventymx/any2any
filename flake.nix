@@ -42,7 +42,7 @@
 
         certificateSettings = ''
           {
-            "path": "cert/localhost",
+            "path": "./cert/localhost",
             "password": "Catapult0-Carpool4"
           }
         '';

@@ -12,13 +12,13 @@
 
 syntax = "proto3";
 
-option csharp_namespace = "Any2Any.Prototype";
+option csharp_namespace = "Any2Any.Prototype.Common";
 
-package demo_service;
+package demo;
 
 import "google/protobuf/empty.proto";
 
-service DemoService {
+service Demo {
   // Upload one or multiple source files
   rpc UploadSourceFiles(stream FileChunk) returns (google.protobuf.Empty);
 
