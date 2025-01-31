@@ -12,7 +12,6 @@
 
 using Any2Any.Prototype.Common;
 using Any2Any.Prototype.Helpers;
-using Any2Any.Prototype.Middleware;
 using Any2Any.Prototype.Services;
 using ClosedXML.Excel;
 using Google.Protobuf;
@@ -82,7 +81,7 @@ public class DemoService(
 
         return new();
     }
-    
+
     /// <summary>
     ///     Downloads a demo export as a stream of file chunks.
     /// </summary>
@@ -127,7 +126,7 @@ public class DemoService(
     private async Task CleanupMappingProcessAsync(ServerCallContext context)
     {
         // Retrieve the MappingProcessId
-        var mappingIdHeader = context.RequestHeaders.FirstOrDefault(h => h.Key == MappingProcessMiddleware.MappingProcessIdHeaderKey)?.Value;
+        var mappingIdHeader = context.RequestHeaders.FirstOrDefault(h => h.Key == MappingProcessServerInterceptor.MappingProcessIdHeaderKey)?.Value;
         if (!Guid.TryParse(mappingIdHeader, out _))
         {
             logger.LogWarning("No valid MappingProcessId found. Skipping cleanup.");
@@ -135,5 +134,7 @@ public class DemoService(
         }
 
         await dbContext.Database.EnsureDeletedAsync(context.CancellationToken);
+
+        // The MappingProcessId is not added to the response trailers, if the database was deleted
     }
 }

@@ -88,7 +88,7 @@ public class Program
                 return httpClientFactory.CreateClient(HttpClientName);
             });
 
-            services.AddSingleton<MappingProcessInterceptor>();
+            services.AddSingleton<MappingProcessClientInterceptor>();
 
             // Add the demo client as singleton to the service provider
             services.AddSingleton(serviceProvider =>
@@ -100,7 +100,7 @@ public class Program
 
                 var channel = GrpcChannel.ForAddress(baseAddress, new() { HttpClient = httpClient });
 
-                var interceptor = serviceProvider.GetRequiredService<MappingProcessInterceptor>();
+                var interceptor = serviceProvider.GetRequiredService<MappingProcessClientInterceptor>();
                 var callInvoker = channel.Intercept(interceptor);
 
                 return new DemoClient(callInvoker);

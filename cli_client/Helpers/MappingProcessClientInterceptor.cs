@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Any2Any.Prototype.CliClient.Helpers;
 
-public class MappingProcessInterceptor(ILogger<MappingProcessInterceptor> logger)
+public class MappingProcessClientInterceptor(ILogger<MappingProcessClientInterceptor> logger)
     : Interceptor
 {
     private const string MappingProcessIdHeaderKey = "mapping-process-id";
@@ -129,15 +129,12 @@ public class MappingProcessInterceptor(ILogger<MappingProcessInterceptor> logger
             mappingProcessId = _mappingProcessId;
         }
 
-        if (!string.IsNullOrEmpty(mappingProcessId))
-        {
-            logger.LogDebug($"Adding MappingProcessId: {mappingProcessId} to request.");
-            var metadata = new Metadata { new(MappingProcessIdHeaderKey, mappingProcessId) };
-            var newOptions = context.Options.WithHeaders(metadata);
-            return new(context.Method, context.Host, newOptions);
-        }
+        if (string.IsNullOrEmpty(mappingProcessId)) return context;
 
-        return context;
+        logger.LogDebug($"Adding MappingProcessId: {mappingProcessId} to request.");
+        var metadata = new Metadata { new(MappingProcessIdHeaderKey, mappingProcessId) };
+        var newOptions = context.Options.WithHeaders(metadata);
+        return new(context.Method, context.Host, newOptions);
     }
 
     /// <summary>

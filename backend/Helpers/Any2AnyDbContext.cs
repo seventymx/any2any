@@ -28,7 +28,7 @@ public class Any2AnyDbContext(DbContextOptions<Any2AnyDbContext> options)
     public DbSet<RecordLink> RecordLinks { get; set; }
     public DbSet<RecordGroup> RecordGroups { get; set; }
     public DbSet<RecordGroupLink> RecordGroupLinks { get; set; }
-
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<RecordLink>()

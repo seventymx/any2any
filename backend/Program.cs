@@ -14,7 +14,6 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Any2Any.Prototype.Extensions;
 using Any2Any.Prototype.Helpers;
-using Any2Any.Prototype.Middleware;
 using Any2Any.Prototype.Services;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
@@ -35,7 +34,7 @@ public class Program
         var basePath = AppContext.BaseDirectory;
 
         var builder = WebApplication.CreateBuilder(args);
-        
+
         builder.Services.AddLogging(loggingBuilder =>
         {
             loggingBuilder.AddConsole();
@@ -78,7 +77,11 @@ public class Program
                 .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
         }));
 
-        builder.Services.AddGrpc();
+        builder.Services.AddGrpc(options =>
+        {
+            // Uses MappingProcessInterceptor to assign a unique identifier to each gRPC request and manage its database context.
+            options.Interceptors.Add<MappingProcessServerInterceptor>();
+        });
 
         builder.Services.AddSingleton(certSettings);
 
@@ -130,7 +133,7 @@ public class Program
             var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
             var httpContext = httpContextAccessor.HttpContext;
 
-            if (httpContext?.Items[MappingProcessMiddleware.Any2AnyDbContextKey] is not Any2AnyDbContext dbContext)
+            if (httpContext?.Items[MappingProcessServerInterceptor.Any2AnyDbContextKey] is not Any2AnyDbContext dbContext)
                 throw new InvalidOperationException("DbContext not available in request scope.");
 
             return dbContext;
@@ -151,13 +154,10 @@ public class Program
         // Enable CORS - allow all origins and add gRPC-Web headers
         app.UseCors(CorsPolicyName);
 
-        // Applies MappingProcessMiddleware to assign a unique identifier to each request and manage its database context
-        app.UseMiddleware<MappingProcessMiddleware>();
-
         // Enable gRPC-Web for all services
         app.UseGrpcWeb(new() { DefaultEnabled = true });
 
-        // Add all services in the Services namespace
+        // Add all services in the GrpcServices namespace
         app.MapGrpcServices();
 
         app.Run();
