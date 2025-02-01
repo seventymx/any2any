@@ -14,7 +14,7 @@ syntax = "proto3";
 
 option csharp_namespace = "Any2Any.Prototype.Common";
 
-package demo;
+package any2any;
 
 import "google/protobuf/empty.proto";
 

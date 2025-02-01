@@ -2,6 +2,9 @@
 .idea/
 *.DotSettings.*
 
+# Ignore vscode files
+.vscode/
+
 # Nix build output
 result
 
@@ -11,3 +14,6 @@ obj/
 
 # Node modules
 node_modules/
+
+# Ignore generated vue_client files
+vue_client/generated/

@@ -1,7 +1,11 @@
 {
     "license": "UNLICENSED",
     "scripts": {
-        "format": "prettier --write ./client"
+        "format": "prettier --write ./vue_client/src",
+        "generate": "pwsh -File ./vue_client/GenerateGrpcWeb.ps1",
+        "start": "webpack serve --mode=development",
+        "build-dev": "webpack --mode=development --stats-error-details",
+        "build": "webpack --mode=production --stats-error-details"
     },
     "devDependencies": {
         "prettier": "^3.4.2"

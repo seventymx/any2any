@@ -28,6 +28,10 @@
         buildDependencies = [
           unstable.dotnet-sdk_8
           unstable.protobuf
+          unstable.powershell
+          unstable.yarn
+          unstable.protoc-gen-js
+          unstable.protoc-gen-grpc-web
         ];
 
         licenseHeader = ''
@@ -51,7 +55,6 @@
         devShell = unstable.mkShell {
           buildInputs = [
             unstable.nixfmt-rfc-style
-            unstable.yarn
             unstable.dotnet-ef
           ] ++ buildDependencies;
 
