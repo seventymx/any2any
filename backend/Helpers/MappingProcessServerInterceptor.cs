@@ -30,7 +30,7 @@ public class MappingProcessServerInterceptor(IServiceScopeFactory serviceScopeFa
         ServerCallContext context,
         UnaryServerMethod<TRequest, TResponse> continuation)
     {
-        await ApplyInterceptorLogic(context);
+        (await ApplyInterceptorLogic(context))();
         return await continuation(request, context);
     }
 
@@ -43,9 +43,12 @@ public class MappingProcessServerInterceptor(IServiceScopeFactory serviceScopeFa
         ServerCallContext context,
         ServerStreamingServerMethod<TRequest, TResponse> continuation)
     {
-        await ApplyInterceptorLogic(context);
-        // TODO: ResponseTrailers are never added - should they be added after the continuation call?
-        await continuation(request, responseStream, context);
+        var addResponseTrailersAction = await ApplyInterceptorLogic(context);
+
+        // Wrap the response stream to track the last message
+        var wrappedStream = new WrappedServerStreamWriter<TResponse>(responseStream, addResponseTrailersAction);
+
+        await continuation(request, wrappedStream, context);
     }
 
     /// <summary>
@@ -56,8 +59,14 @@ public class MappingProcessServerInterceptor(IServiceScopeFactory serviceScopeFa
         ServerCallContext context,
         ClientStreamingServerMethod<TRequest, TResponse> continuation)
     {
-        await ApplyInterceptorLogic(context);
-        return await continuation(requestStream, context);
+        var addResponseTrailersAction = await ApplyInterceptorLogic(context);
+
+        var response = await continuation(requestStream, context);
+
+        // Ensure ResponseTrailers are added **after** streaming complete
+        addResponseTrailersAction();
+
+        return response;
     }
 
     /// <summary>
@@ -69,15 +78,18 @@ public class MappingProcessServerInterceptor(IServiceScopeFactory serviceScopeFa
         ServerCallContext context,
         DuplexStreamingServerMethod<TRequest, TResponse> continuation)
     {
-        // TODO: Test this interceptor with a bidirectional streaming service - no endpoint available at the moment
-        await ApplyInterceptorLogic(context);
-        await continuation(requestStream, responseStream, context);
+        var addResponseTrailersAction = await ApplyInterceptorLogic(context);
+
+        // Wrap the response stream to track the last message
+        var wrappedStream = new WrappedServerStreamWriter<TResponse>(responseStream, addResponseTrailersAction);
+
+        await continuation(requestStream, wrappedStream, context);
     }
 
     /// <summary>
     ///     Centralized logic for assigning MappingProcessId and Database Context.
     /// </summary>
-    private async Task ApplyInterceptorLogic(ServerCallContext context)
+    private async Task<Action> ApplyInterceptorLogic(ServerCallContext context)
     {
         // Retrieve HttpContext (gRPC requests go through Kestrel, so this is available)
         var httpContext = httpContextAccessor.HttpContext;
@@ -95,7 +107,11 @@ public class MappingProcessServerInterceptor(IServiceScopeFactory serviceScopeFa
         if (!isValidGuid)
         {
             mappingProcessGuid = Guid.NewGuid();
-            logger.LogWarning($"Generated new MappingProcessId: {mappingProcessGuid}");
+            logger.LogInformation($"Generated new MappingProcessId: {mappingProcessGuid}");
+        }
+        else
+        {
+            logger.LogInformation($"Received MappingProcessId: {mappingProcessGuid}");
         }
 
         // Store MappingProcessId in the context user state (available in gRPC services)
@@ -114,6 +130,14 @@ public class MappingProcessServerInterceptor(IServiceScopeFactory serviceScopeFa
         // Store `DbContext` in `HttpContext.Items` so it can be resolved via DI
         httpContext.Items[Any2AnyDbContextKey] = dbContext;
 
+        return () => AddResponseTrailers(context, dbContext, mappingProcessGuid);
+    }
+
+    /// <summary>
+    ///     Adds the MappingProcessId to the response trailers.
+    /// </summary>
+    private static void AddResponseTrailers(ServerCallContext context, Any2AnyDbContext dbContext, Guid mappingProcessGuid)
+    {
         // Check if the db file still exists - don't add the MappingProcessId to the response trailers if it doesn't
         if (!File.Exists(dbContext.Database.GetDbConnection().DataSource))
             return;

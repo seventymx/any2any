@@ -107,17 +107,25 @@ public class DemoService(
         int bytesRead;
         while ((bytesRead = await memoryStream.ReadAsync(buffer, context.CancellationToken)) > 0)
         {
+            var isFinalChunk = bytesRead < buffer.Length;
+
             var fileChunk = new FileChunk
             {
                 FileName = "demo_export",
                 FileType = "xlsx",
                 Content = ByteString.CopyFrom(buffer, 0, bytesRead),
-                IsFinalChunk = bytesRead < buffer.Length
+                IsFinalChunk = isFinalChunk
             };
-            await responseStream.WriteAsync(fileChunk, context.CancellationToken);
-        }
 
-        await CleanupMappingProcessAsync(context);
+            // Remove the temp database and mark the final message to trigger response trailers in the interceptor
+            if (isFinalChunk && responseStream is WrappedServerStreamWriter<FileChunk> wrappedStream)
+            {
+                wrappedStream.IsFinalMessage = true;
+                await CleanupMappingProcessAsync(context);
+            }
+
+            await responseStream.WriteAsync(fileChunk);
+        }
     }
 
     /// <summary>
