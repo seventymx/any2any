@@ -1,7 +1,7 @@
 import { DemoClient } from "../generated/DemoServiceClientPb";
 import { Empty } from "google-protobuf/google/protobuf/empty_pb";
 
-const baseAddress = process.env.BASE_URL as string;
+const baseAddress = `https://${window.location.host}`;
 
 console.log("baseAddress", baseAddress);
 

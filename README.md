@@ -9,12 +9,10 @@ Any2Any is a dynamic mapping tool designed to bridge export formats (CSV/Excel) 
 ## Development Environment
 
 ```sh
-# Enter the Nix shell
+# Enter the Nix development shell
 nix develop
 
-# Open the project in Visual Studio Code
-# **Note:** Configuration files like `.prettierrc.json` are located in the root directory.
-# Ensure you open the root directory in your editor for the configurations to apply correctly.
+# Open the project in VS Code (configs like `.prettierrc.json` are in the root)
 code .
 
 # Open the solution in JetBrains Rider
@@ -25,6 +23,19 @@ cd backend
 
 # Start the backend server
 dotnet run
+
+# Return to the root directory
+cd ..
+
+# Install dependencies (ensure this runs from the root)
+yarn install
+
+# Generate gRPC-web client stubs
+yarn generate
+
+# Start the Vue frontend dev server (backend requests are proxied)
+yarn start
+
 ```
 
 The application uses SQLite as its database, combined with EF Core (code-first) for schema management. The database is created and seeded automatically when the application starts.

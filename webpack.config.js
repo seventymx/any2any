@@ -1,5 +1,4 @@
 const path = require("path");
-const webpack = require("webpack");
 const { VueLoaderPlugin } = require("vue-loader");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
@@ -8,7 +7,6 @@ const fs = require("fs");
 
 module.exports = (_, options) => {
     const isProduction = options.mode === "production";
-    const devBaseUrl = `https://localhost:${process.env.VUE_APP_PORT}`;
 
     return {
         entry: {
@@ -71,9 +69,6 @@ module.exports = (_, options) => {
             }),
             new CopyWebpackPlugin({
                 patterns: [{ from: "vue_client/public", to: "./" }]
-            }),
-            new webpack.DefinePlugin({
-                "process.env.BASE_URL as string": JSON.stringify(isProduction ? "`https://${window.location.host}`" : devBaseUrl)
             })
         ],
         devServer: {
@@ -92,7 +87,7 @@ module.exports = (_, options) => {
             proxy: [
                 {
                     context: ["/any2any.Demo/"],
-                    target: devBaseUrl,
+                    target: `https://localhost:${process.env.API_PORT}`,
                     changeOrigin: true,
                     secure: false
                 }
