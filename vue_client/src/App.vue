@@ -10,7 +10,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="min-h-screen flex flex-col items-center justify-center bg-gray-100 text-gray-900">
+    <div class="min-h-screen flex flex-col items-center justify-center text-gray-900">
         <div class="bg-white shadow-lg rounded-lg p-6 max-w-sm w-full">
             <h1 class="text-xl font-bold text-center">gRPC Vue 3 Client</h1>
             <p class="mt-4 text-center text-blue-500">{{ message }}</p>
