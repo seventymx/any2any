@@ -24,8 +24,7 @@ module.exports = (_, options) => {
         resolve: {
             extensions: [".ts", ".js", ".vue", ".json"],
             alias: {
-                "@": path.resolve(__dirname, "vue_client/src"),
-                vue: "vue/dist/vue.esm-bundler.js"
+                "@": path.resolve(__dirname, "vue_client/src")
             }
         },
         module: {
@@ -77,6 +76,13 @@ module.exports = (_, options) => {
                 patterns: [{ from: "vue_client/public", to: "./" }]
             })
         ],
+        optimization: {
+            usedExports: true,
+            minimize: isProduction,
+            minimizer: [`...`, new (require("css-minimizer-webpack-plugin"))()],
+            splitChunks: { chunks: "all" },
+            runtimeChunk: "single"
+        },
         devServer: {
             static: path.join(__dirname, "vue_client/dist"),
             compress: true,

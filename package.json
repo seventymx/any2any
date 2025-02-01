@@ -4,8 +4,8 @@
         "format": "prettier --write ./vue_client/src",
         "generate": "pwsh -File ./vue_client/GenerateGrpcWeb.ps1",
         "start": "webpack serve --mode=development",
-        "build-dev": "webpack --mode=development --stats-error-details",
-        "build": "webpack --mode=production --stats-error-details"
+        "build-dev": "rm -rf vue_client/dist && webpack --mode=development --stats-error-details",
+        "build": "rm -rf vue_client/dist && webpack --mode=production --stats-error-details"
     },
     "devDependencies": {
         "@tailwindcss/postcss": "^4.0.3",
@@ -14,6 +14,7 @@
         "autoprefixer": "^10.4.20",
         "copy-webpack-plugin": "^12.0.2",
         "css-loader": "^7.1.2",
+        "css-minimizer-webpack-plugin": "^7.0.0",
         "google-protobuf": "^3.21.4",
         "html-webpack-plugin": "^5.6.3",
         "mini-css-extract-plugin": "^2.9.2",
@@ -25,7 +26,6 @@
         "ts-loader": "^9.5.2",
         "typescript": "^5.7.3",
         "vue-loader": "^17.4.2",
-        "vue-template-compiler": "^2.7.16",
         "webpack": "^5.97.1",
         "webpack-cli": "^6.0.1",
         "webpack-dev-server": "^5.2.0"

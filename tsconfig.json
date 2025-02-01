@@ -10,7 +10,8 @@
         "baseUrl": "./",
         "paths": {
             "@/*": ["vue_client/src/*"]
-        }
+        },
+        "types": ["vue"]
     },
     "include": ["vue_client/src/**/*.ts", "vue_client/src/**/*.d.ts", "vue_client/src/**/*.vue"]
 }

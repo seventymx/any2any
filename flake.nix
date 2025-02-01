@@ -67,6 +67,7 @@
           '';
         };
 
+        # TODO: Replace backend package output with a Docker image containing the .NET build and Vue build in wwwroot, and enable static file serving in the pipeline.
         packages.backend = unstable.stdenv.mkDerivation {
           pname = "Any2Any";
           version = "0.1.0";
