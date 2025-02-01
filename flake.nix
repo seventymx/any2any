@@ -4,14 +4,14 @@
   file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
   Author: Steffen70 <steffen@seventy.mx>
-  Creation Date: 2024-07-25
+  Creation Date: 2025-01-26
 
   Contributors:
   - Contributor Name <contributor@example.com>
 */
 
 {
-  description = "A development environment for working with C#.";
+  description = "A development environment for working with C#, Vue.js and gRPC.";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
