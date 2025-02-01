@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "noImplicitAny": true,
+        "target": "esnext",
+        "module": "esnext",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "moduleResolution": "node",
+        "baseUrl": "./",
+        "paths": {
+            "@/*": ["vue_client/src/*"]
+        }
+    },
+    "include": ["vue_client/src/**/*.ts", "vue_client/src/**/*.d.ts", "vue_client/src/**/*.vue"]
+}

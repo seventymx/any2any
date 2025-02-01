@@ -61,7 +61,8 @@
           shellHook = ''
             cat ${licenseHeader}
 
-            export API_PORT=8443
+            export VUE_APP_PORT=8443
+            export API_PORT=8444
             export CERTIFICATE_SETTINGS='${certificateSettings}'
           '';
         };

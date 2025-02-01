@@ -29,6 +29,16 @@ public class DemoService(
 ) : Demo.DemoBase
 {
     /// <summary>
+    ///    Greets the client with a simple message.
+    /// </summary>
+    public override async Task<HelloWorldResponse> HelloWorld(Empty request, ServerCallContext context)
+    {
+        var response = new HelloWorldResponse { Message = "Hello, World!" };
+
+        return await Task.FromResult(response);
+    }
+
+    /// <summary>
     ///     Uploads source files sent by the client and processes them.
     /// </summary>
     public override async Task<Empty> UploadSourceFiles(IAsyncStreamReader<FileChunk> requestStream, ServerCallContext context)

@@ -17,3 +17,6 @@ node_modules/
 
 # Ignore generated vue_client files
 vue_client/generated/
+
+# Ignore vue_client build output
+vue_client/dist/

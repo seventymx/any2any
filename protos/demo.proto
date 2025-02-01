@@ -19,6 +19,9 @@ package any2any;
 import "google/protobuf/empty.proto";
 
 service Demo {
+  // Demo Hello World
+  rpc HelloWorld(google.protobuf.Empty) returns (HelloWorldResponse);
+
   // Upload one or multiple source files
   rpc UploadSourceFiles(stream FileChunk) returns (google.protobuf.Empty);
 
@@ -30,6 +33,12 @@ service Demo {
 
   // Download the generated demo export file as a stream
   rpc DownloadDemoExport(FileDownloadRequest) returns (stream FileChunk);
+}
+
+// Response for the HelloWorld RPC
+message HelloWorldResponse {
+  // The message to return
+  string message = 1;
 }
 
 // Message for uploading file chunks
