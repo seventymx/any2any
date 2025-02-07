@@ -21,56 +21,86 @@ import "google/protobuf/empty.proto";
 // TODO: Split into multiple grpc service files
 
 service Demo {
+
+  // ---- Demo (not required) ----
   // Demo Hello World
   // TODO: Remove when not needed anymore
   rpc HelloWorld(google.protobuf.Empty) returns (HelloWorldResponse);
 
+  // The order of the steps is not fixed and there can be multiple steps of the same type (e.g., multiple normalization steps)
+
+  // ---- File upload step ----
   // Upload one or multiple source files
   rpc UploadSourceFiles(stream FileChunk) returns (UploadSourceFilesResponse);
 
+  // ---- Normalization step ----
+  // - Used to populate the tab control (entity name as tile)
   // Get a list of all entities (tables) - created on file upload
   rpc GetEntities(google.protobuf.Empty) returns (EntityListResponse);
 
+  // - Display columns in a Table column name in first column, example value in second, and normalization preview in third
   // Get the columns and types for a specific entity (only inconsistent columns)
   rpc GetInconsistentColumns(ColumnsRequest) returns (ColumnsWithTypesResponse);
   
   // Get a preview of the normalization - send example values in request
   rpc GetNormalizationPreview(NormalizationPreviewRequest) returns (NormalizationPreviewResponse);
 
+  // - When all columns that need to be normalized don't have any errors in the preview, the user can normalize the columns (errors can occure - column needs to be highlighted)
   // Normalize the column types for a specific entity - with regex formatting
   rpc NormalizeColumns(ColumnNormalizationRequest) returns (ColumnNormalizationResponse);
 
+  // ---- Column combination step ----
   // Get the columns and an example value for a specific entity
   rpc GetEntityColumns(ColumnsRequest) returns (ColumnsWithExampleResponse);
   
+  // - Display the columns as breadcrumbs 
+  // - Create a dropdown to select the strategy
+  // - An optional input field to drag the breadcrumbs into e.g. for string interpolation
+  // - A preview of the result
   // Get a preview of the column combination - send example values in request
   rpc GetColumnCombinationPreview(ColumnCombinationPreviewRequest) returns (ColumnCombinationPreviewResponse);
 
   // Combine columns to a new column - with strategies: Regex, Math, StringInterpolation
   rpc CombineColumns(CombineColumnsRequest) returns (CombineColumnsResponse);
 
+  // ---- Entity linking step ----
+  // - Create a table with all the columns off every entity (vertically placed)
+  // - Each column that can be linked is marked with a checkbox (when checked all columns with the same name are checked)
+  // - Nice to have draw a line between the columns that are linked (doted line as long as SetLinkedColumn is not called)
   // Get the columns that can be linked - available on multiple entities
   rpc GetLinkableColumns(google.protobuf.Empty) returns (ColumnsResponse);
 
   // Set the column name to link files with
   rpc SetLinkedColumn(LinkColumnsRequest) returns (LinkColumnsResponse);
 
+  // ---- Multi value column step ----
+  // - Needs a new tab control (the entities have changed)
+  // - Columns of the entity are now show as column titles and the example values are listet below
+  // - Add a dropdown to select the combine strategy at the bottom and the preview of the result below (like a total in excel)
   // Get columns that have multiple values per record group
   rpc GetMultiValueColumns(google.protobuf.Empty) returns (ColumnsWithMultipleValuesResponse);
 
   // Get a preview of the value combination - send example values in request
-  rpc GetRMultiValueCombinationPreview(MultiValueCombinationPreviewRequest) returns (MultiValueCombinationPreviewResponse);
+  rpc GetMultiValueCombinationPreview(MultiValueCombinationPreviewRequest) returns (MultiValueCombinationPreviewResponse);
   
   // Combine columns of a record group into a single column
   rpc CombineRecordGroupColumns(CombineValuesRequest) returns (CombineValuesResponse);
 
+  // ---- Export step ----
+  // - The entity is again show in the tab control title
+  // - The columns are shown as checkboxes in multiple columns to keep the component small
   // Download the generated demo export file as a stream
-  // TODO: Remove when not needed anymore
+  // TODO: Rename endpoint in real service
   rpc DownloadDemoExport(FileDownloadRequest) returns (stream FileChunkResponse);
   
+  // - Add a button to download the mapping recipe (for future use - a other route allows to upload the recipe + source files to directly map the files)
   // Download mapping recipe as a stream
   rpc DownloadMappingRecipe(google.protobuf.Empty) returns (stream FileChunkResponse);
   
+  // ---- Direct mapping ----
+  // - A drag and drop area to upload the source files and the mapping recipe + a download button to download the export file
+  // - This endpoint is also used for fully automated mapping with a small terminal app that acesses the Source System API
+  // - maps the files with a predefined recipe and uploads the files to the target system (systemd service, windows service or scheduled script)
   // Upload the source files and mapping recipe as a stream and get the mapped file as a stream
   rpc MapWithRecipe(stream FileChunk) returns (stream FileChunkResponse);
 }
