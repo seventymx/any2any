@@ -8,11 +8,13 @@ Any2Any is a dynamic mapping tool designed to bridge export formats (CSV/Excel) 
 
 ## Development Environment
 
+**Reminder:** Add the development certificate to your browser's trusted store. See [README](cert/README.md) for details.
+
 ```sh
 # Enter the Nix development shell
 nix develop
 
-# Open the project in VS Code (configs like `.prettierrc.json` are in the root)
+# Open the project in VS Code (configs like ".prettierrc.json" are in the root)
 code .
 
 # Open the solution in JetBrains Rider
@@ -55,8 +57,7 @@ EOF
 # Restart the nix-daemon to apply the changes
 sudo systemctl restart nix-daemon
 
-# Add alias to start rider with the current context
-# **Note:** This assumes you have JetBrains Rider installed and you use the Bash shell
+# Add alias to start rider with the current context - this assumes you have JetBrains Rider installed and you use the Bash shell
 echo 'alias riderdev="rider . > /dev/null 2>&1 &"' >> ~/.bash_aliases
 ```
 
