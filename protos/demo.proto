@@ -18,21 +18,61 @@ package any2any;
 
 import "google/protobuf/empty.proto";
 
+// TODO: Split into multiple grpc service files
+
 service Demo {
   // Demo Hello World
+  // TODO: Remove when not needed anymore
   rpc HelloWorld(google.protobuf.Empty) returns (HelloWorldResponse);
 
   // Upload one or multiple source files
-  rpc UploadSourceFiles(stream FileChunk) returns (google.protobuf.Empty);
+  rpc UploadSourceFiles(stream FileChunk) returns (UploadSourceFilesResponse);
 
-  // Get an array of column names - from the source files
-  rpc GetColumnNames(google.protobuf.Empty) returns (ColumnNamesResponse);
+  // Get a list of all entities (tables) - created on file upload
+  rpc GetEntities(google.protobuf.Empty) returns (EntityListResponse);
+
+  // Get the columns and types for a specific entity (only inconsistent columns)
+  rpc GetInconsistentColumns(ColumnsRequest) returns (ColumnsWithTypesResponse);
+  
+  // Get a preview of the normalization - send example values in request
+  rpc GetNormalizationPreview(NormalizationPreviewRequest) returns (NormalizationPreviewResponse);
+
+  // Normalize the column types for a specific entity - with regex formatting
+  rpc NormalizeColumns(ColumnNormalizationRequest) returns (ColumnNormalizationResponse);
+
+  // Get the columns and an example value for a specific entity
+  rpc GetEntityColumns(ColumnsRequest) returns (ColumnsWithExampleResponse);
+  
+  // Get a preview of the column combination - send example values in request
+  rpc GetColumnCombinationPreview(ColumnCombinationPreviewRequest) returns (ColumnCombinationPreviewResponse);
+
+  // Combine columns to a new column - with strategies: Regex, Math, StringInterpolation
+  rpc CombineColumns(CombineColumnsRequest) returns (CombineColumnsResponse);
+
+  // Get the columns that can be linked - available on multiple entities
+  rpc GetLinkableColumns(google.protobuf.Empty) returns (ColumnsResponse);
 
   // Set the column name to link files with
-  rpc SetLinkedColumn(LinkedColumnRequest) returns (google.protobuf.Empty);
+  rpc SetLinkedColumn(LinkColumnsRequest) returns (LinkColumnsResponse);
+
+  // Get columns that have multiple values per record group
+  rpc GetMultiValueColumns(google.protobuf.Empty) returns (ColumnsWithMultipleValuesResponse);
+
+  // Get a preview of the value combination - send example values in request
+  rpc GetRMultiValueCombinationPreview(MultiValueCombinationPreviewRequest) returns (MultiValueCombinationPreviewResponse);
+  
+  // Combine columns of a record group into a single column
+  rpc CombineRecordGroupColumns(CombineValuesRequest) returns (CombineValuesResponse);
 
   // Download the generated demo export file as a stream
-  rpc DownloadDemoExport(FileDownloadRequest) returns (stream FileChunk);
+  // TODO: Remove when not needed anymore
+  rpc DownloadDemoExport(FileDownloadRequest) returns (stream FileChunkResponse);
+  
+  // Download mapping recipe as a stream
+  rpc DownloadMappingRecipe(google.protobuf.Empty) returns (stream FileChunkResponse);
+  
+  // Upload the source files and mapping recipe as a stream and get the mapped file as a stream
+  rpc MapWithRecipe(stream FileChunk) returns (stream FileChunkResponse);
 }
 
 // Response for the HelloWorld RPC
@@ -53,20 +93,305 @@ message FileChunk {
   bool isFinalChunk = 4;
 }
 
-// Response containing column names
-message ColumnNamesResponse {
+message FileChunkResponse {
+  // Stream of file chunks
+  FileChunk chunks = 1;
+  // Optional entities not linked exception
+  optional bool entitiesNotLinkedException = 2;
+  // Optional multiple values exception
+  optional bool multipleValuesException = 3;
+  // Optional recipe not ready exception
+  optional bool recipeNotReadyException = 4;
+  // Optional recipe did not match exception
+  optional bool recipeDidNotMatchException = 5;
+}
+
+message FileResponse {
+  // Name of the file
+  string fileName = 1;
+  // Successful upload
+  bool successful = 2;
+  // Wrong file type exception
+  bool wrongFileTypeException = 3;
+  // Value parsing exception
+  bool valueParsingException = 4;
+  // File already exists exception
+  bool fileAlreadyExistsException = 5;
+  // Table not found exception
+  bool tableNotFoundException = 6;
+}
+
+message UploadSourceFilesResponse {
+  repeated FileResponse files = 1;
+}
+
+// Entity definition
+message EntityDefinition {
+  // The name of the entity
+  string entityName = 1;
+  // The checksum of the entity - combining all required columns and the entity name into a md5 hash
+  string entityChecksum = 2;
+}
+
+// Response containing a list of entities
+message EntityListResponse {
+  // List of available entities
+  repeated EntityDefinition entities = 1;
+}
+
+// Request for getting columns and an example value
+message ColumnsRequest {
+  // The entity to get the columns for
+  string entity = 1;
+}
+
+// Enum for inconsistent column types
+enum InconsistentColumnType {
+  STRING = 0;
+  INT = 1;
+  DECIMAL = 2;
+  DATETIME = 3;
+}
+
+// Column definition (column name + checksum)
+message ColumnDefinition {
+  // The name of the column
+  string columnName = 1;
+  // The checksum of the column - combining the column name and the entity name or record group hash into a md5 hash
+  string columnChecksum = 2;
+}
+
+// Column and types of that column
+message InconsistentColumn {
+  // The column
+  ColumnDefinition column = 1;
+  // The type of the column
+  repeated InconsistentColumnType columnTypes = 2;
+  // Inconsistent values example
+  repeated ExampleValue exampleValues = 3;
+  // Available strategies for normalization
+  repeated CombineValuesStrategy strategies = 4;
+}
+
+// Response containing columns and types
+message ColumnsWithTypesResponse {
+  // List of available columns
+  repeated InconsistentColumn columns = 1;
+}
+
+message NormalizationPreviewRequest {
+  // The example values of the columns
+  repeated ExampleValue exampleValues = 1;
+  // The regex pattern to match
+  string regexPattern = 2;
+  // The target type to convert to
+  InconsistentColumnType targetType = 3;
+}
+
+message NormalizationExampleValue {
+  // The example value
+  ExampleValue exampleValue = 1;
+  // The normalized value
+  ExampleValue normalizedValue = 2;
+}
+
+// Response for normalization preview - returns the example values with normalization result
+message NormalizationPreviewResponse {
+  // List of available example values
+  repeated NormalizationExampleValue exampleValues = 1;
+  bool successful = 2;
+  optional NormalizationExceptionResponse failedColumns = 3;
+}
+
+message NormalizationExceptionResponse {
+  repeated ColumnsWithExampleResponse failedColumns = 1;
+}
+
+// Request for normalizing column types - with regex and target type to check if successful
+message ColumnNormalizationRequest {
+  // The column
+  ColumnDefinition column = 1;
+  // The regex pattern to match
+  string regexPattern = 2;
+  // The target type to convert to
+  InconsistentColumnType targetType = 3;
+}
+
+// Response for normalizing column types - checks if regex pattern resulted in target type conversion (return values that did not convert)
+message ColumnNormalizationResponse {
+  // Was the normalization successful
+  bool successful = 1;
+  // Target type of the normalization
+  InconsistentColumnType targetType = 2;
+  // Optional list of Column names with example values that did not convert
+  optional NormalizationExceptionResponse failedColumns = 3;
+}
+
+message ColumnWithExampleValue {
+  // The column
+  ColumnDefinition column = 1;
+  // The example value of the column
+  ExampleValue exampleValue = 2;
+}
+
+message ColumnsWithExampleResponse {
   // List of available column names
-  repeated string columnNames = 1;
+  repeated ColumnWithExampleValue columns = 1;
+}
+
+message ExampleValue {
+  oneof value {
+    string stringValue = 1;
+    int32 intValue = 2;
+    double decimalValue = 3;
+    // Use int64 for timestamps (store as Unix epoch time)
+    int64 dateTimeValue = 4;
+  }
+}
+
+// Strategy for combining columns
+enum CombineColumnsStrategy {
+  REGEX = 0;
+  MATH = 1;
+  STRING_INTERPOLATION = 2;
+}
+
+message ColumnCombinationPreviewRequest {
+  // The example values of the columns
+  repeated ColumnWithExampleValue exampleValues = 1;
+  // The strategy to use for combining the columns
+  CombineColumnsStrategy strategy = 2;
+}
+
+message ColumnCombinationExampleValue {
+  // The example value
+  repeated ColumnWithExampleValue exampleValue = 1;
+  // The combined value
+  ExampleValue combinedValue = 2;
+}
+
+message ColumnCombinationPreviewResponse {
+  // Combination result
+  optional ColumnCombinationExampleValue combinationResult = 1;
+  CombineColumnsResponse exceptions = 2;
+}
+
+// Request for combining columns
+message CombineColumnsRequest {
+  // The name of the new column
+  string newColumnName = 1;
+  // The columns to combine
+  repeated ColumnDefinition columnsToCombine = 2;
+  // The strategy to use for combining the columns
+  CombineColumnsStrategy strategy = 3;
+}
+
+// Response for combining columns
+message CombineColumnsResponse {
+  bool successful = 1;
+  bool multipleValuesException = 2;
+  bool inconsistentTypesException = 3;
+}
+
+// Response containing columns
+message ColumnsResponse {
+  // List of available columns
+  repeated ColumnDefinition columns = 1;
 }
 
 // Request for setting the linked column
-message LinkedColumnRequest {
-  // The column name to link files with
-  string columnName = 1;
+message LinkColumnsRequest {
+  // The column names to link files with
+  string columns = 1;
+}
+
+message LinkColumnsResponse {
+  bool successful = 1;
+  bool forbiddenColumnException = 2;
+}
+
+// Response containing column with multiple values (similar to ColumnsWithExampleResponse but with multiple values)
+message ColumnWithMultipleValues {
+  // The column
+  ColumnDefinition column = 1;
+  // The values of the column
+  repeated ExampleValue values = 2;
+  // available strategies for combining the values
+  repeated CombineValuesStrategy strategies = 3;
+}
+
+message ColumnsWithMultipleValuesResponse {
+  // List of available columns
+  repeated ColumnWithMultipleValues columns = 1;
+}
+
+// Value combining strategies
+enum CombineValuesStrategy {
+  // Concatenates multiple string values (e.g., "A, B, C")
+  STRING_JOIN = 0;
+  // Sums numeric values
+  SUM = 1;
+  // Computes the average of numeric values
+  AVG = 2;
+  // Finds the maximum value
+  MAX = 3;
+  // Finds the minimum value
+  MIN = 4;
+  // Counts the number of values
+  COUNT = 5;
+  // Computes the median value
+  MEDIAN = 6;
+  // Computes the most frequently occurring value
+  MODE = 7;
+  // Joins values without separators (e.g., "ABC")
+  CONCATENATE = 8;
+  // Multiplies all numeric values together
+  PRODUCT = 9;
+  // Computes the range (max - min)
+  RANGE = 10;
+  // Computes statistical variance
+  VARIANCE = 11;
+  // Computes standard deviation
+  STD_DEV = 12;
+  // Returns distinct/unique values
+  DISTINCT = 13;
+  // Picks the first non-empty value
+  FIRST_NON_EMPTY = 14;
+  // Picks the last non-empty value
+  LAST_NON_EMPTY = 15;  
+}
+
+message MultiValueCombinationPreviewRequest {
+  // The example values
+  repeated ExampleValue exampleValues = 1;
+  // The strategy to use for combining the values
+  CombineValuesStrategy strategy = 2;
+}
+
+message MultiValueCombinationPreviewResponse {
+  // The combined value
+  ExampleValue combinedValue = 1;
+  CombineValuesResponse exceptions = 2;
+}
+
+// Request for combining values
+message CombineValuesRequest {
+  // The columns to combine
+  repeated ColumnDefinition column = 1;
+  // The name of the new column
+  string newColumnName = 2;
+  // The strategy to use for combining the values
+  CombineValuesStrategy strategy = 3;
+}
+
+// Response for combining values
+message CombineValuesResponse {
+  bool successful = 1;
+  bool forbiddenStrategyException = 2;
 }
 
 // Request for downloading a file
 message FileDownloadRequest {
-  // ID of the file to download
-  string fileId = 1;
+  // Columns to export
+  repeated ColumnDefinition columns = 1;
 }

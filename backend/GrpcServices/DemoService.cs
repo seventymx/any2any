@@ -12,11 +12,14 @@
 
 using Any2Any.Prototype.Common;
 using Any2Any.Prototype.Helpers;
+using Any2Any.Prototype.Model;
 using Any2Any.Prototype.Services;
 using ClosedXML.Excel;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using Microsoft.EntityFrameworkCore;
+using Value = DocumentFormat.OpenXml.Spreadsheet.Value;
 
 namespace Any2Any.Prototype.GrpcServices;
 
@@ -68,17 +71,76 @@ public class DemoService(
     }
 
     /// <summary>
+    ///     Fetches the names of all entities.
+    /// </summary>
+    public override async Task<EntityListResponse> GetEntities(Empty request, ServerCallContext context)
+    {
+        var entityNames = await dbContext.Entities.Select(e => e.Name).ToListAsync();
+
+        return new() { Entities = { entityNames } };
+    }
+
+    /// <summary>
+    ///     Fetches the names of columns for a specific entity. + Example values (first value of each column)
+    /// </summary>
+    public override async Task<ColumnNamesWithExampleResponse> GetEntityColumns(ColumnNamesRequest request, ServerCallContext context)
+    {
+        var entity = dbContext.Entities
+            .Include(entity => entity.Properties)
+            .FirstOrDefault(e => e.Name == request.Entity);
+
+        if (entity == null) throw new RpcException(new(StatusCode.NotFound, "Entity not found."));
+
+        List<(string columnName, ExampleValue exampleValue)> columns = new();
+
+        foreach (var property in entity.Properties)
+        {
+            var propertyName = property.Name;
+            var value = await dbContext.Values.FirstAsync(v => v.EntityProperty.Id == property.Id);
+
+            ExampleValue exampleValue;
+
+            switch (value.DataType)
+            {
+                case DataType.Integer:
+                    exampleValue = new() { IntValue = (int)value.GetDeserializedValue() };
+                    break;
+                case DataType.Decimal:
+                    exampleValue = new() { DecimalValue = (double)value.GetDeserializedValue() };
+                    break;
+                case DataType.DateTime:
+                    // Convert DateTime to Unix Timestamp
+                    var dateTime = (DateTime)value.GetDeserializedValue();
+                    exampleValue = new() { DateTimeValue = new DateTimeOffset(dateTime).ToUnixTimeSeconds() };
+                    break;
+                default:
+                case DataType.String:
+                    exampleValue = new() { StringValue = value.GetDeserializedValue() as string ?? "" };
+                    break;
+            }
+
+            columns.Add((propertyName, exampleValue));
+        }
+
+        return new()
+        {
+            ColumnNames = { columns.Select(c => c.columnName) },
+            ExampleValues = { columns.Select(c => c.exampleValue) }
+        };
+    }
+
+    /// <summary>
     ///     Fetches the names of columns that are common to multiple entities.
     /// </summary>
-    public override Task<ColumnNamesResponse> GetColumnNames(Empty request, ServerCallContext context)
+    public override async Task<ColumnNamesResponse> GetLinkableColumns(Empty request, ServerCallContext context)
     {
-        var commonColumnNames = dbContext.EntityProperties
+        var commonColumnNames = await dbContext.EntityProperties
             .GroupBy(p => p.Name)
             .Where(g => g.Count() > 1)
             .Select(g => g.Key)
-            .ToList();
+            .ToListAsync();
 
-        return Task.FromResult(new ColumnNamesResponse { ColumnNames = { commonColumnNames } });
+        return new() { ColumnNames = { commonColumnNames } };
     }
 
     /// <summary>
@@ -131,7 +193,7 @@ public class DemoService(
             if (isFinalChunk && responseStream is WrappedServerStreamWriter<FileChunk> wrappedStream)
             {
                 wrappedStream.IsFinalMessage = true;
-                await CleanupMappingProcessAsync(context);
+                // await CleanupMappingProcessAsync(context);
             }
 
             await responseStream.WriteAsync(fileChunk);
